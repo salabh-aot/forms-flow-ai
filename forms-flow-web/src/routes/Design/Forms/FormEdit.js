@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useParams, useLocation } from "react-router-dom";
 import Modal from "react-bootstrap/Modal";
 import {
-  Errors,
+  // Errors,
   FormBuilder,
   deleteForm,
   Form,
@@ -58,6 +58,7 @@ import {
   setFormDeleteStatus,
   setFormHistories,
   setFormAuthorizationDetails,
+  clearFormError,
 } from "../../../actions/formActions";
 import {
   saveFormProcessMapperPut,
@@ -80,7 +81,7 @@ import {
   removeTenantKeywithSlash,
   convertSelectedValueToMultiSelectOption,
   compareRolesState,
-  addTenantkey,
+  addTenantkey
 } from "../../../helper/helper.js";
 import { useMutation } from "react-query";
 import NavigateBlocker from "../../../components/CustomComponents/NavigateBlocker";
@@ -89,6 +90,7 @@ import { convertToNormalForm, convertToWizardForm } from "../../../helper/conver
 import { SystemVariables } from '../../../constants/variables';
 import EditorActions from "./EditActions";
 import { getRoute } from "../../../constants/constants";
+import useFormBuilderAutoScroll from "./useFormBuilderAutoScroll";
 import { navigateToDesignFormBuild } from "../../../helper/routerHelper";
 
 // constant values
@@ -322,6 +324,7 @@ const EditComponent = () => {
   const [initialIsAnonymous, setInitialIsAnonymous] = useState(null);
   const [settingsChanged, setSettingsChanged] = useState(false);
   const formBuilderInitializedRef = useRef(false);
+  const formBuilderContainerRef = useRef(null);
   const [migration, setMigration] = useState(false);
   const [loadingVersioning, setLoadingVersioning] = useState(false); // Loader state for versioning
   const [isSavingNewVersion, setIsSavingNewVersion] = useState(false); // Loader state for saving new version
@@ -930,6 +933,14 @@ const EditComponent = () => {
     }
   };
 
+  // Auto-scroll listener for form builder container during drag events
+  const isAutoScrollEnabled = 
+    createDesigns && 
+    activeTab.primary === 'form' && 
+    activeTab.secondary === 'builder';
+  
+  useFormBuilderAutoScroll(formBuilderContainerRef, isAutoScrollEnabled);
+
   // Parse URL parameters for tab state
 useEffect(() => {
   const queryParams = new URLSearchParams(location.search);
@@ -1070,7 +1081,10 @@ const isFormTitleMissing = () => {
   return !trimmedTitle || trimmedTitle === defaultTitle;
 };
 
-const handleSaveButtonClick = () => {
+  const handleSaveButtonClick = () => {
+  // Reset any previous errors when save is clicked
+  dispatch(clearFormError("form"));
+  
   if (isFormTitleMissing()) {
     setShowNameFormModal(true);
     return;
@@ -1387,6 +1401,9 @@ const handleSaveFromBlocker = async () => {
 
   const saveFormData = async ({ showToast = true }) => {
     try {
+      // Reset any previous errors at the start of save
+      dispatch(clearFormError("form"));
+      
       const isFormChanged = true; // Hard code the value to always make backend call on Save Layout
       if (!isFormChanged && !promptNewVersion) {
         showToast && toast.success(t("Form updated successfully"));
@@ -1557,6 +1574,9 @@ const handleSaveFromBlocker = async () => {
   /* ------------------------ Save form with workflow for create route ------------------------ */
 const saveFormWithWorkflow = async (publishAfterSave = false) => {
   try {
+    // Reset any previous errors at the start of save
+    dispatch(clearFormError("form"));
+    
     setFormSubmitted(true);
 
     // Prepare form data
@@ -2486,7 +2506,10 @@ const saveFormWithWorkflow = async (publishAfterSave = false) => {
         // Check if builder sub-tab is active
         if (activeTab.secondary === 'builder') {
           return (
-            <div className={`form-builder custom-scroll ${isPublished ? 'published-builder' : 'unpublished-builder'}`}>
+            <div 
+              ref={formBuilderContainerRef}
+              className={`form-builder custom-scroll ${isPublished ? 'published-builder' : 'unpublished-builder'}`}
+            >
               {!createDesigns ? (
                 <div className="px-4 pt-4 form-preview">
                   <Form
@@ -2816,7 +2839,14 @@ const saveFormWithWorkflow = async (publishAfterSave = false) => {
         spinner
         text={t("Loading...")}
       >
-        <Errors errors={errors} />
+        {/* <Errors errors={errors} /> */}
+        <Alert
+          message={errors?.message}
+          variant={AlertVariant.WARNING}
+          isShowing={!!errors?.message}
+          autoClose={true}
+          displayTime={3000}
+        />
 
         <div className="">
           <div className="">
